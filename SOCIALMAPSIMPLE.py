@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from SMalchemyBase import Base, User, Vote, Search, Friendship, UserInterests, Interest, Place, Event, SharedThought, Blocked
+from SMalchemyBase import Base, User, Vote, Friendship, UserInterests, Interest, Place, Event, SharedThought, Blocked
 
 
 # Connect to your SQLite database
@@ -122,6 +122,8 @@ def login_user():
 
 # After logging in or registering, this shows the user's basic profile info like their name, email, and interests.
 # This pulls from User, UserInterests, and Interest tables.
+# AI USAGE: I fixed the interest to query(intrest).get() because of a error i was getting regarding 
+#"legacy construct in 2.0. The method is now available as Session.get()"
 def show_profile_summary(user):
     print("\n--- Your Profile Summary ---")
     print(f"Username: {user.username}")
@@ -135,7 +137,8 @@ def show_profile_summary(user):
     print(f"Interests: ", end="")
     interests = session.query(UserInterests).filter_by(user_id=user.id).all()
     if interests:
-        print(", ".join(session.query(Interest).get(i.interest_id).name for i in interests))
+        interest_names = [session.get(Interest, i.interest_id).name for i in interests]
+        print(", ".join(interest_names))
     else:
         print("None")
 
@@ -167,7 +170,7 @@ def logged_in_menu(user):
         elif choice == "3":
             share_thought(user)
         elif choice == "4":
-            search_places()
+            search_places(user)
         elif choice == "5":
             vote_on_place(user)
         elif choice == "6":
@@ -414,13 +417,11 @@ def edit_profile(user):
 
 
 # This lets users search for places by name or category.
-# It pulls data from the Place table and uses the search table.
+# It pulls data from the Place table
 def search_places(user):
     print("\n--- Search Places ---")
     term = input("Search by name or category: ").lower()
-    search_log = Search(user_id=user.id, search_term=term, searched_at=datetime.now(timezone.utc))
-    session.add(search_log)
-    session.commit()
+
     results = session.query(Place).filter((Place.name.contains(term)) | (Place.category.contains(term))).all()
     if results:
         for p in results:
